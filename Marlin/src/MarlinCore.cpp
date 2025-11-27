@@ -152,8 +152,8 @@
   #include "feature/encoder_i2c.h"
 #endif
 
-#if (HAS_TRINAMIC_CONFIG || HAS_TMC_SPI) && DISABLED(PSU_DEFAULT_OFF)
-  #include "feature/tmc_util.h"
+#if HAS_TRINAMIC_CONFIG
+  #include "module/stepper/trinamic.h"
 #endif
 
 #if HAS_CUTTER
@@ -483,7 +483,7 @@ inline void manage_inactivity(const bool no_stepper_sleep=false) {
     // Check if the kill button was pressed and wait to ensure the signal is not noise
     // typically caused by poor insulation and grounding on LCD cables.
     // Lower numbers here will increase response time and therefore safety rating.
-    // It is recommended to set this as low as possibe without false triggers.
+    // It is recommended to set this as low as possible without false triggers.
     // -------------------------------------------------------------------------------
     #ifndef KILL_DELAY
       #define KILL_DELAY 250
@@ -531,11 +531,15 @@ inline void manage_inactivity(const bool no_stepper_sleep=false) {
       constexpr millis_t CUB_DEBOUNCE_DELAY_##N = 250UL;               \
       static millis_t next_cub_ms_##N;                                 \
       if (BUTTON##N##_HIT_STATE == READ(BUTTON##N##_PIN)               \
-        && (ENABLED(BUTTON##N##_WHEN_PRINTING) || printer_not_busy)) { \
+        && (ENABLED(BUTTON##N##_WHEN_PRINTING) || printer_not_busy)    \
+      ) {                                                              \
         if (ELAPSED(ms, next_cub_ms_##N)) {                            \
           next_cub_ms_##N = ms + CUB_DEBOUNCE_DELAY_##N;               \
           CODE;                                                        \
-          queue.inject(F(BUTTON##N##_GCODE));                          \
+          if (ENABLED(BUTTON##N##_IMMEDIATE))                          \
+            gcode.process_subcommands_now(F(BUTTON##N##_GCODE));       \
+          else                                                         \
+            queue.inject(F(BUTTON##N##_GCODE));                        \
           TERN_(HAS_MARLINUI_MENU, ui.quick_feedback());               \
         }                                                              \
       }                                                                \
