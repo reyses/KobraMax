@@ -3854,18 +3854,13 @@ void Temperature::disable_all_heaters() {
  */
 void Temperature::update_raw_temperatures() {
 
-  // TODO: can this be collapsed into a HOTEND_LOOP()?
-  #if HAS_TEMP_ADC_0 && !TEMP_SENSOR_IS_MAX_TC(0)
-    temp_hotend[0].update();
-  #endif
-
-  #if HAS_TEMP_ADC_1 && !TEMP_SENSOR_IS_MAX_TC(1)
-    temp_hotend[1].update();
-  #endif
-
-  #if HAS_TEMP_ADC_2 && !TEMP_SENSOR_IS_MAX_TC(2)
-    temp_hotend[2].update();
-  #endif
+  HOTEND_LOOP() {
+    switch (e) {
+      #define _CASE_UPDATE_ADC(N) case N: TERN_(HAS_TEMP_ADC_##N, temp_hotend[N].update()); break;
+      REPEAT(HOTENDS, _CASE_UPDATE_ADC)
+      #undef _CASE_UPDATE_ADC
+    }
+  }
 
   #if HAS_TEMP_ADC_REDUNDANT && !TEMP_SENSOR_IS_MAX_TC(REDUNDANT)
     temp_redundant.update();
@@ -3874,12 +3869,6 @@ void Temperature::update_raw_temperatures() {
   #if HAS_TEMP_ADC_BED && !TEMP_SENSOR_IS_MAX_TC(BED)
     temp_bed.update();
   #endif
-
-  TERN_(HAS_TEMP_ADC_3,       temp_hotend[3].update());
-  TERN_(HAS_TEMP_ADC_4,       temp_hotend[4].update());
-  TERN_(HAS_TEMP_ADC_5,       temp_hotend[5].update());
-  TERN_(HAS_TEMP_ADC_6,       temp_hotend[6].update());
-  TERN_(HAS_TEMP_ADC_7,       temp_hotend[7].update());
   TERN_(HAS_TEMP_ADC_CHAMBER, temp_chamber.update());
   TERN_(HAS_TEMP_ADC_PROBE,   temp_probe.update());
   TERN_(HAS_TEMP_ADC_COOLER,  temp_cooler.update());
