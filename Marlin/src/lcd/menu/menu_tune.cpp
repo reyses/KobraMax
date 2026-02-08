@@ -47,9 +47,7 @@
     #include "../dogm/marlinui_DOGM.h"
   #endif
 
-  // TODO: Replace fmsg with MSG_BABYSTEP_N and index substitution
-
-  void _lcd_babystep(const AxisEnum axis, FSTR_P const fmsg) {
+  void _lcd_babystep(const AxisEnum axis) {
     if (ui.use_click()) return ui.goto_previous_screen_no_defer();
     if (ui.encoderPosition) {
       const int16_t steps = int16_t(ui.encoderPosition) * (
@@ -64,8 +62,9 @@
       babystep.add_steps(axis, steps);
     }
     if (ui.should_draw()) {
+      MenuItemBase::init(axis);
       const float mps = planner.mm_per_step[axis];
-      MenuEditItemBase::draw_edit_screen(fmsg, BABYSTEP_TO_STR(mps * babystep.accum));
+      MenuEditItemBase::draw_edit_screen(GET_TEXT_F(MSG_BABYSTEP_N), BABYSTEP_TO_STR(mps * babystep.accum));
       #if ENABLED(BABYSTEP_DISPLAY_TOTAL)
         const bool in_view = TERN1(HAS_MARLINUI_U8GLIB, PAGE_CONTAINS(LCD_PIXEL_HEIGHT - MENU_FONT_HEIGHT, LCD_PIXEL_HEIGHT - 1));
         if (in_view) {
@@ -93,12 +92,12 @@
   }
 
   #if ENABLED(BABYSTEP_XY)
-    void _lcd_babystep_x() { _lcd_babystep(X_AXIS, GET_TEXT_F(MSG_BABYSTEP_X)); }
-    void _lcd_babystep_y() { _lcd_babystep(Y_AXIS, GET_TEXT_F(MSG_BABYSTEP_Y)); }
+    void _lcd_babystep_x() { _lcd_babystep(X_AXIS); }
+    void _lcd_babystep_y() { _lcd_babystep(Y_AXIS); }
   #endif
 
   #if DISABLED(BABYSTEP_ZPROBE_OFFSET)
-    void _lcd_babystep_z() { _lcd_babystep(Z_AXIS, GET_TEXT_F(MSG_BABYSTEP_Z)); }
+    void _lcd_babystep_z() { _lcd_babystep(Z_AXIS); }
     void lcd_babystep_z()  { _lcd_babystep_go(_lcd_babystep_z); }
   #endif
 
