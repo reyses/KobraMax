@@ -236,27 +236,41 @@ var WmUpload = {
         setTimeout(pgline, 500);
       }
       else {
-        let p = wmTools.GetPercentage(i+1,fl);
-        WmUpload.FileProgress(p,"Analyzing line "+(i+1)+" of "+fl);
-        let gitem = { line:WmUpload.FileContent[i], process:false, cksum:0 };
+        let linesInChunk = 0;
+        const chunkSize = 100;
+        while (i < fl && linesInChunk < chunkSize) {
+          let gitem = { line: WmUpload.FileContent[i], process: false, cksum: 0 };
 
-        if(gitem.line.trim()==="" || gitem.line.match(/^ *$/)) { jsLog.Verbose("GLine: "+i+": "+gitem.line+" => Empty line (skip)"); }
-        else if(gitem.line.substring(0,1)===";") { jsLog.Verbose("GLine: "+i+": "+gitem.line+" => Comment line (skip)"); }
-        else if(gitem.line.indexOf(";") > -1) { gitem.line = gitem.line.substring(0,gitem.line.indexOf(";")); gitem.process=true; }
-        else { gitem.process = true; }
+          if (gitem.line.trim() === "" || gitem.line.match(/^ *$/)) {
+            jsLog.Verbose("GLine: " + i + ": " + gitem.line + " => Empty line (skip)");
+          } else if (gitem.line.substring(0, 1) === ";") {
+            jsLog.Verbose("GLine: " + i + ": " + gitem.line + " => Comment line (skip)");
+          } else if (gitem.line.indexOf(";") > -1) {
+            gitem.line = gitem.line.substring(0, gitem.line.indexOf(";"));
+            gitem.process = true;
+          } else {
+            gitem.process = true;
+          }
 
-        if(gitem.process) {
-          gitem.line = "N"+n+" "+gitem.line.trim();
-          gitem.line = gitem.line+"*"+wmGCommandItem.CalcChecksum(gitem.line);
-          jsLog.Verbose("GLINE TO SEND: "+gitem.line);
-          wmGCommands.CustomCmd.GCode = gitem.line;
-          wmWebSoket.Send(wmGCommands.CustomCmd);
-          n++;
+          if (gitem.process) {
+            gitem.line = "N" + n + " " + gitem.line.trim();
+            gitem.line = gitem.line + "*" + wmGCommandItem.CalcChecksum(gitem.line);
+            jsLog.Verbose("GLINE TO SEND: " + gitem.line);
+            wmGCommands.CustomCmd.GCode = gitem.line;
+            wmWebSoket.Send(wmGCommands.CustomCmd);
+            n++;
+          }
+          i++;
+          linesInChunk++;
         }
-        i++;
-        if (i < fl) { setTimeout(pgline, 10); }
-        else {
-          WmUpload.FileProgress(100,"GCode Analysis completed!");
+
+        let p = wmTools.GetPercentage(i, fl);
+        WmUpload.FileProgress(p, "Analyzing line " + i + " of " + fl);
+
+        if (i < fl) {
+          setTimeout(pgline, 10);
+        } else {
+          WmUpload.FileProgress(100, "GCode Analysis completed!");
           WmUpload.ReadyToWrite = false;
           wmWebSoket.Send(wmGCommands.SdFileStop);
           WmUpload.FileCompleted();
