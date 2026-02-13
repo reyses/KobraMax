@@ -3182,20 +3182,25 @@ void Temperature::init() {
     #endif
   #endif // HAS_AUTO_FAN
 
+  #define _TEMP_MIN_LOOP(N,R,C,L) do{ \
+    while ((C) < (L)) R += TEMPDIR(N) * (OVERSAMPLENR); \
+  }while(0)
+  #define _TEMP_MAX_LOOP(N,R,C,L) do{ \
+    while ((C) > (L)) R -= TEMPDIR(N) * (OVERSAMPLENR); \
+  }while(0)
+
   #if HAS_HOTEND
     #define _TEMP_MIN_E(NR) do{ \
       const celsius_t tmin_tmp = TERN(TEMP_SENSOR_##NR##_IS_CUSTOM, 0, int16_t(pgm_read_word(&TEMPTABLE_##NR [TEMP_SENSOR_##NR##_MINTEMP_IND].celsius))), \
                       tmin = _MAX(HEATER_##NR##_MINTEMP, tmin_tmp); \
       temp_range[NR].mintemp = tmin; \
-      while (analog_to_celsius_hotend(temp_range[NR].raw_min, NR) < tmin) \
-        temp_range[NR].raw_min += TEMPDIR(NR) * (OVERSAMPLENR); \
+      _TEMP_MIN_LOOP(NR, temp_range[NR].raw_min, analog_to_celsius_hotend(temp_range[NR].raw_min, NR), tmin); \
     }while(0)
     #define _TEMP_MAX_E(NR) do{ \
       const celsius_t tmax_tmp = TERN(TEMP_SENSOR_##NR##_IS_CUSTOM, 2000, int16_t(pgm_read_word(&TEMPTABLE_##NR [TEMP_SENSOR_##NR##_MAXTEMP_IND].celsius)) - 1), \
                       tmax = _MIN(HEATER_##NR##_MAXTEMP, tmax_tmp); \
       temp_range[NR].maxtemp = tmax; \
-      while (analog_to_celsius_hotend(temp_range[NR].raw_max, NR) > tmax) \
-        temp_range[NR].raw_max -= TEMPDIR(NR) * (OVERSAMPLENR); \
+      _TEMP_MAX_LOOP(NR, temp_range[NR].raw_max, analog_to_celsius_hotend(temp_range[NR].raw_max, NR), tmax); \
     }while(0)
 
     #define _MINMAX_TEST(N,M) (!TEMP_SENSOR_##N##_IS_DUMMY && HOTENDS > (N) && TEMP_SENSOR_##N##_IS_THERMISTOR && defined(HEATER_##N##_##M##TEMP))
@@ -3250,19 +3255,14 @@ void Temperature::init() {
     #endif
   #endif // HAS_HOTEND
 
-  // TODO: combine these into the macros above
   #if HAS_HEATED_BED
-    while (analog_to_celsius_bed(temp_sensor_range_bed.raw_min) < BED_MINTEMP)
-      temp_sensor_range_bed.raw_min += TEMPDIR(BED) * (OVERSAMPLENR);
-    while (analog_to_celsius_bed(temp_sensor_range_bed.raw_max) > BED_MAXTEMP)
-      temp_sensor_range_bed.raw_max -= TEMPDIR(BED) * (OVERSAMPLENR);
+    _TEMP_MIN_LOOP(BED, temp_sensor_range_bed.raw_min, analog_to_celsius_bed(temp_sensor_range_bed.raw_min), BED_MINTEMP);
+    _TEMP_MAX_LOOP(BED, temp_sensor_range_bed.raw_max, analog_to_celsius_bed(temp_sensor_range_bed.raw_max), BED_MAXTEMP);
   #endif
 
   #if HAS_HEATED_CHAMBER
-    while (analog_to_celsius_chamber(temp_sensor_range_chamber.raw_min) < CHAMBER_MINTEMP)
-      temp_sensor_range_chamber.raw_min += TEMPDIR(CHAMBER) * (OVERSAMPLENR);
-    while (analog_to_celsius_chamber(temp_sensor_range_chamber.raw_max) > CHAMBER_MAXTEMP)
-      temp_sensor_range_chamber.raw_max -= TEMPDIR(CHAMBER) * (OVERSAMPLENR);
+    _TEMP_MIN_LOOP(CHAMBER, temp_sensor_range_chamber.raw_min, analog_to_celsius_chamber(temp_sensor_range_chamber.raw_min), CHAMBER_MINTEMP);
+    _TEMP_MAX_LOOP(CHAMBER, temp_sensor_range_chamber.raw_max, analog_to_celsius_chamber(temp_sensor_range_chamber.raw_max), CHAMBER_MAXTEMP);
   #endif
 
   #if HAS_COOLER
@@ -3273,10 +3273,8 @@ void Temperature::init() {
   #endif
 
   #if ALL(HAS_TEMP_BOARD, THERMAL_PROTECTION_BOARD)
-    while (analog_to_celsius_board(temp_sensor_range_board.raw_min) < BOARD_MINTEMP)
-      temp_sensor_range_board.raw_min += TEMPDIR(BOARD) * (OVERSAMPLENR);
-    while (analog_to_celsius_board(temp_sensor_range_board.raw_max) > BOARD_MAXTEMP)
-      temp_sensor_range_board.raw_max -= TEMPDIR(BOARD) * (OVERSAMPLENR);
+    _TEMP_MIN_LOOP(BOARD, temp_sensor_range_board.raw_min, analog_to_celsius_board(temp_sensor_range_board.raw_min), BOARD_MINTEMP);
+    _TEMP_MAX_LOOP(BOARD, temp_sensor_range_board.raw_max, analog_to_celsius_board(temp_sensor_range_board.raw_max), BOARD_MAXTEMP);
   #endif
 
   #if ALL(HAS_TEMP_SOC, THERMAL_PROTECTION_SOC)
