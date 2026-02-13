@@ -42,8 +42,6 @@ def custom_ld_script(ldname):
 # Encrypt ${PROGNAME}.bin and save it with a new name. This applies (mostly) to MKS boards
 # This PostAction is set up by offset_and_rename.py for envs with 'build.encrypt_mks'.
 def encrypt_mks(source, target, env, new_name):
-    import sys
-
     key = [0xA3, 0xBD, 0xAD, 0x0D, 0x41, 0x11, 0xBB, 0x8D, 0xDC, 0x80, 0x2D, 0xD0, 0xD2, 0xC4, 0x9B, 0x1E, 0x26, 0xEB, 0xE3, 0x33, 0x4A, 0x15, 0xE4, 0x0A, 0xB3, 0xB1, 0x3C, 0x93, 0xBB, 0xAF, 0xF7, 0x3E]
 
     # If FIRMWARE_BIN is defined by config, override all
@@ -53,17 +51,23 @@ def encrypt_mks(source, target, env, new_name):
     fwpath = Path(target[0].path)
     fwfile = fwpath.open("rb")
     enfile = Path(target[0].dir.path, new_name).open("wb")
-    length = fwpath.stat().st_size
-    position = 0
+
     try:
-        while position < length:
-            byte = fwfile.read(1)
-            if 320 <= position < 31040:
-                byte = chr(ord(byte) ^ key[position & 31])
-                if sys.version_info[0] > 2:
-                    byte = bytes(byte, 'latin1')
-            enfile.write(byte)
-            position += 1
+        # 1. Copy the unencrypted header (0-320)
+        chunk1 = fwfile.read(320)
+        enfile.write(chunk1)
+
+        if len(chunk1) == 320:
+            # 2. Encrypt the protected range (320-31040)
+            # The key alignment works perfectly because 320 % 32 == 0
+            chunk2 = bytearray(fwfile.read(30720))
+            for i in range(len(chunk2)):
+                chunk2[i] ^= key[i % 32]
+            enfile.write(chunk2)
+
+            # 3. Copy the rest of the file efficiently
+            shutil.copyfileobj(fwfile, enfile)
+
     finally:
         fwfile.close()
         enfile.close()
