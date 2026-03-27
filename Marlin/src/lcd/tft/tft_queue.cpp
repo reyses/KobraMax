@@ -269,8 +269,24 @@ void TFT_Queue::add_text(uint16_t x, uint16_t y, uint16_t color, const uint16_t 
   end_of_queue += sizeof(parametersCanvasText_t);
 
   uint16_t *character = (uint16_t *)end_of_queue;
-  // TODO: Deal with maxWidth
-  while ((*character++ = *pointer++) != 0);
+
+  if (maxWidth > 0) {
+    uint16_t pixel_width = 0;
+    while (*pointer != 0) {
+      const uint16_t ch = *pointer;
+      glyph_t *g = TFT_String::glyph(ch);
+      if (g) {
+        if (pixel_width + g->bbxWidth > maxWidth) break;
+        pixel_width += g->dWidth;
+      }
+      *character++ = *pointer++;
+    }
+    *character++ = 0;
+  }
+  else {
+    while ((*character++ = *pointer++) != 0);
+  }
+
   end_of_queue = (uint8_t *)character;
 
   parameters->nextParameter = end_of_queue;
