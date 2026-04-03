@@ -1515,30 +1515,33 @@ void CardReader::cdroot() {
             char name1[LONG_FILENAME_LENGTH];
           #endif
 
-          // Bubble Sort
-          for (int16_t i = fileCnt; --i;) {
-            bool didSwap = false;
-            int16_t o1 = sort_order[0];
+          // Compare names from the array or just the two buffered names
+          auto _sort_cmp_file = [](char * const n1, char * const n2) -> bool {
+            const bool sort = strcasecmp(n1, n2) > 0;
+            return (TERN(SDSORT_GCODE, sort_alpha == AS_REV, ENABLED(SDSORT_REVERSE))) ? !sort : sort;
+          };
+
+          // Binary Insertion Sort
+          for (int16_t i = 1; i < fileCnt; ++i) {
+            const int16_t o1 = sort_order[i]; // Value to insert (Right operand)
+
             #if DISABLED(SDSORT_USES_RAM)
               // By default re-read the names from SD for every compare
               // retaining only two filenames at a time. This is very
               // slow but is safest and uses minimal RAM.
-              selectFileByIndex(o1);             // Pre-fetch the first entry and save it
-              strcpy(name1, longest_filename()); // so the loop only needs one fetch
+              selectFileByIndex(o1);             // Pre-fetch the entry to insert
+              strcpy(name1, longest_filename()); // so the inner loop only needs one fetch
               #if HAS_FOLDER_SORTING
-                bool dir1 = flag.filenameIsDir;
+                const bool dir1 = flag.filenameIsDir;
               #endif
               if ((i & 0x7) == 7) hal.watchdog_refresh();
             #endif
 
-            for (int16_t j = 0; j < i; ++j) {
-              const int16_t o2 = sort_order[j + 1];
+            int16_t left = 0, right = i;
+            while (left < right) {
+              const int16_t mid = left + (right - left) / 2;
+              const int16_t o2 = sort_order[mid]; // Mid value (Left operand)
 
-              // Compare names from the array or just the two buffered names
-              auto _sort_cmp_file = [](char * const n1, char * const n2) -> bool {
-                const bool sort = strcasecmp(n1, n2) > 0;
-                return (TERN(SDSORT_GCODE, sort_alpha == AS_REV, ENABLED(SDSORT_REVERSE))) ? !sort : sort;
-              };
               #if ENABLED(SDSORT_USES_RAM)
                 #define _SORT_CMP_FILE() _sort_cmp_file(sortnames[o1], sortnames[o2])
               #else
@@ -1554,16 +1557,11 @@ void CardReader::cdroot() {
                 #endif
               #endif
 
-              // The most economical method reads names as-needed
-              // throughout the loop. Slow if there are many.
               #if DISABLED(SDSORT_USES_RAM)
                 selectFileByIndex(o2);
-                const bool dir2 = flag.filenameIsDir;
                 char * const name2 = longest_filename(); // Use the string in-place
-                if ((i & 0x7) == 7) hal.watchdog_refresh();
               #endif
 
-              // Sort the current pair according to settings.
               if (
                 #if HAS_FOLDER_SORTING
                   #if ENABLED(SDSORT_GCODE)
@@ -1575,22 +1573,21 @@ void CardReader::cdroot() {
                   _SORT_CMP_FILE()
                 #endif
               ) {
-                // Reorder the index, indicate that sorting happened
-                // Note that the next o1 will be the current o1. No new fetch needed.
-                sort_order[j] = o2;
-                sort_order[j + 1] = o1;
-                didSwap = true;
+                // If Right > Left, Right should be to the right of Left
+                left = mid + 1;
               }
               else {
-                // The next o1 is the current o2. No new fetch needed.
-                o1 = o2;
-                #if DISABLED(SDSORT_USES_RAM)
-                  TERN_(HAS_FOLDER_SORTING, dir1 = dir2);
-                  strcpy(name1, name2);
-                #endif
+                right = mid;
               }
             }
-            if (!didSwap) break;
+
+            // Insert o1 at 'left'
+            if (i > left) {
+              // Move elements sort_order[left...i-1] to sort_order[left+1...i]
+              memmove(&sort_order[left + 1], &sort_order[left], (i - left) * sizeof(*sort_order));
+              sort_order[left] = o1;
+            }
+            if ((i & 0x7) == 0) hal.watchdog_refresh();
           }
         }
         #endif // Bubble Sort
